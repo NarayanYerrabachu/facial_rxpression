@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  audio-portrait:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./assets:/app/assets
+      - ./output:/app/output
+      - ./audio_portrait:/app/audio_portrait
+      - sadtalker:/app/SadTalker
+      - liveportrait:/app/LivePortrait
+    environment:
+      - SADTALKER_DIR=/app/SadTalker
+      - LIVEPORTRAIT_DIR=/app/LivePortrait
+    command: ["python", "run.py", "--audio", "assets/speech.wav"]
+
+volumes:
+  sadtalker:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/narayanyerrabachu/facefusion-pipeline/SadTalker
+  liveportrait:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/narayanyerrabachu/git/LivePortrait

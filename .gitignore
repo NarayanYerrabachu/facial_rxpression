@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+output/
+assets/my_face.jpg
+*.pkl
+*.mat
+Pipfile.lock
+requirements.txt
