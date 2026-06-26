@@ -22,20 +22,22 @@ import sys
 import tempfile
 
 DEFAULT_FACE      = osp.join(osp.dirname(osp.realpath(__file__)), "assets", "my_face.jpg")
-SADTALKER_DIR     = "/Users/narayanyerrabachu/facefusion-pipeline/SadTalker"
-LIVEPORTRAIT_DIR  = "/Users/narayanyerrabachu/git/LivePortrait"
+SADTALKER_DIR     = os.environ.get("SADTALKER_DIR", "/Users/narayanyerrabachu/facefusion-pipeline/SadTalker")
+LIVEPORTRAIT_DIR  = os.environ.get("LIVEPORTRAIT_DIR", "/Users/narayanyerrabachu/git/LivePortrait")
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="Audio-driven portrait animation")
     p.add_argument("--image", "-i", default=DEFAULT_FACE, help="Portrait image path")
-    p.add_argument("--audio", "-a", required=True, help="Audio file (wav/mp3/m4a)")
+    p.add_argument("--audio", "-a", default=None, help="Audio file (wav/mp3/m4a)")
     p.add_argument("--output", "-o", default="output/result.mp4", help="Output video path")
     p.add_argument("--fps", type=float, default=25.0)
     p.add_argument("--skip-sadtalker", action="store_true",
                    help="Skip SadTalker, provide --driving directly")
     p.add_argument("--driving", "-d", default=None,
                    help="Driving video (skip SadTalker if provided)")
+    p.add_argument("--with-liveportrait", action="store_true",
+                   help="Add LivePortrait stage after SadTalker (experimental)")
     return p.parse_args()
 
 
@@ -50,7 +52,7 @@ def run_sadtalker(image_path: str, audio_path: str, out_dir: str) -> str:
         "--driven_audio", osp.abspath(audio_path),
         "--source_image", osp.abspath(image_path),
         "--result_dir", osp.abspath(out_dir),
-        "--still",
+        "--expression_scale", "1.5",
         "--preprocess", "crop",
     ]
     result = subprocess.run(cmd, cwd=SADTALKER_DIR, capture_output=False)
@@ -75,8 +77,8 @@ def run_liveportrait(source_image: str, driving_video: str, output_path: str, fp
     cmd = [
         sys.executable,
         osp.join(LIVEPORTRAIT_DIR, "inference.py"),
-        "--source", source_image,
-        "--driving", driving_video,
+        "--source", osp.abspath(source_image),
+        "--driving", osp.abspath(driving_video),
         "--output_dir", out_dir,
         "--flag_pasteback",
         "--flag_stitching",
@@ -112,8 +114,10 @@ def main():
             f"Portrait not found: {args.image}\n"
             f"Put your face photo at: {DEFAULT_FACE}"
         )
-    if not osp.exists(args.audio):
+    if args.audio and not osp.exists(args.audio):
         raise FileNotFoundError(f"Audio not found: {args.audio}")
+    if not args.driving and not args.audio:
+        raise ValueError("Either --audio or --driving must be provided")
 
     # Stage 1: SadTalker
     if args.driving:
@@ -122,12 +126,23 @@ def main():
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
             driving_video = run_sadtalker(args.image, args.audio, tmpdir)
-            # Stage 2: LivePortrait
-            run_liveportrait(args.image, driving_video, args.output, args.fps)
+            if args.with_liveportrait:
+                run_liveportrait(args.image, driving_video, args.output, args.fps)
+            else:
+                import shutil
+                os.makedirs(osp.dirname(osp.abspath(args.output)), exist_ok=True)
+                shutil.copy(driving_video, args.output)
+                print(f"\nDone → {args.output}")
         return
 
     # Stage 2 only (if --driving was provided)
-    run_liveportrait(args.image, driving_video, args.output, args.fps)
+    if args.with_liveportrait:
+        run_liveportrait(args.image, driving_video, args.output, args.fps)
+    else:
+        import shutil
+        os.makedirs(osp.dirname(osp.abspath(args.output)), exist_ok=True)
+        shutil.copy(driving_video, args.output)
+        print(f"\nDone → {args.output}")
 
 
 if __name__ == "__main__":
