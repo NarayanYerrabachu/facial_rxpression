@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
@@ -11,7 +11,7 @@ RUN pip install pipenv
 WORKDIR /app
 
 COPY Pipfile ./
-RUN pipenv install --deploy --system
+RUN pipenv lock && pipenv install --system
 
 COPY run.py ./
 COPY audio_portrait/ ./audio_portrait/
